@@ -1,14 +1,15 @@
 name: Build OnePlus 6 and 6t KernelSU Kernel
+
 on:
   workflow_dispatch:
   schedule:
-      # 每周周六00:00运行. 时间设置参考： http://crontab.guru
-      - cron: '0 0 * * 6'
+    # Runs every Saturday at 00:00 UTC
+    - cron: '0 0 * * 6'
   push:
     branches:
       - HEAD
   pull_request:
-      branches:
+    branches:
       - HEAD
 
 jobs:
@@ -21,6 +22,7 @@ jobs:
       CCACHE_HARDLINK: "true"
       KERNEL_DEFCONFIG: "RM6785_defconfig"
       KERNEL_CMDLINE: "ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O=out"
+
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -34,26 +36,46 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update -y 
-        sudo apt install gcc-aarch64-linux-gnu -y
-        sudo apt install gcc-arm-linux-gnueabi -y
-        sudo apt install binutils make python3 libssl-dev build-essential bc  bison flex unzip libssl-dev ca-certificates xz-utils mkbootimg cpio device-tree-compiler git git-lfs -y
-        git clone https://github.com/kdrag0n/proton-clang --dept=1 -b master
+        sudo apt-get install -y \
+          gcc-aarch64-linux-gnu \
+          gcc-arm-linux-gnueabi \
+          binutils \
+          make \
+          python3 \
+          libssl-dev \
+          build-essential \
+          bc \
+          bison \
+          flex \
+          unzip \
+          ca-certificates \
+          xz-utils \
+          mkbootimg \
+          cpio \
+          device-tree-compiler \
+          git \
+          git-lfs
+
+        # Clone proton-clang and AnyKernel3
+        git clone --depth=1 -b master https://github.com/kdrag0n/proton-clang
         git clone https://github.com/osm0sis/AnyKernel3
+        # Modify AnyKernel3 scripts
         sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
         sed -i 's!BLOCK=/dev/block/platform/omap/omap_hsmmc.0/by-name/boot;!BLOCK=auto;!g' AnyKernel3/anykernel.sh
         sed -i 's/IS_SLOT_DEVICE=0;/is_slot_device=auto;/g' AnyKernel3/anykernel.sh
         rm -rf AnyKernel3/.git* AnyKernel3/README.md
-    
+
     - name: GetTime
       id: get_time
       run: |
-        echo "TIME=$(TZ=UTC+3 date +%m%d%H%M )" >> $GITHUB_OUTPUT
+        echo "TIME=$(TZ=UTC+3 date +%m%d%H%M)" >> $GITHUB_OUTPUT
 
     - name: Build Kernel-With-KernelSU
       run: |
         export PATH=$(pwd)/proton-clang/bin/:$PATH
-        make $KERNEL_CMDLINE $KERNEL_DEFCONFIG CC="ccache clang"
-        make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
+        # Build kernel with the default linker
+        make $KERNEL_CMDLINE $KERNEL_DEFCONFIG CC="ccache clang" LD="ld.bfd"
+        make $KERNEL_CMDLINE CC="ccache clang" LD="ld.bfd" -j$(nproc --all)
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3
 
     - name: Upload Kernel-SU
