@@ -1,10 +1,10 @@
-name: Build OnePlus 6 and 6t KernelSU Kernel
+name: Build Kernel
 
 on:
   workflow_dispatch:
   schedule:
     # Runs every Saturday at 00:00 UTC
-    - cron: '0 0 * * 6'
+    - cron: "0 0 * * 6"
   push:
     branches:
       - HEAD
@@ -21,13 +21,13 @@ jobs:
       CCACHE_MAXSIZE: "2G"
       CCACHE_HARDLINK: "true"
       KERNEL_DEFCONFIG: "RM6785_defconfig"
-      KERNEL_CMDLINE: "ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O=out"
+      KERNEL_CMDLINE: "ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O=out"
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
-        submodules: 'true'
+        submodules: "true"
         fetch-depth: 100
 
     - name: Set up ccache
@@ -39,6 +39,7 @@ jobs:
         sudo apt-get install -y \
           gcc-aarch64-linux-gnu \
           gcc-arm-linux-gnueabi \
+          aria2 \
           binutils \
           make \
           python3 \
@@ -56,10 +57,14 @@ jobs:
           git \
           git-lfs
 
-        # Clone proton-clang and AnyKernel3
-        git clone --depth=1 -b master https://github.com/kdrag0n/proton-clang
+        # Set up custom Clang
+        curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+        aria2c -j$(nproc --all) $(curl -fsSL https://github.com/ZyCromerZ/Clang/raw/main/Clang-main-link.txt)
+        mkdir zyc-clang
+        tar -xzvf Clang-*.tar.gz -C zyc-clang >> /dev/null
+        
+        # Clone AnyKernel3
         git clone https://github.com/osm0sis/AnyKernel3
-        # Modify AnyKernel3 scripts
         sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
         sed -i 's!BLOCK=/dev/block/platform/omap/omap_hsmmc.0/by-name/boot;!BLOCK=auto;!g' AnyKernel3/anykernel.sh
         sed -i 's/IS_SLOT_DEVICE=0;/is_slot_device=auto;/g' AnyKernel3/anykernel.sh
@@ -68,18 +73,17 @@ jobs:
     - name: GetTime
       id: get_time
       run: |
-        echo "TIME=$(TZ=UTC+3 date +%m%d%H%M)" >> $GITHUB_OUTPUT
+        echo "TIME=$(TZ=UTC+3 date +%s)" >> $GITHUB_OUTPUT
 
     - name: Build Kernel-With-KernelSU
       run: |
-        export PATH=$(pwd)/proton-clang/bin/:$PATH
-        # Build kernel with the default linker
-        make $KERNEL_CMDLINE $KERNEL_DEFCONFIG CC="ccache clang" LD="ld.bfd"
-        make $KERNEL_CMDLINE CC="ccache clang" LD="ld.bfd" -j$(nproc --all)
+        export PATH=$(pwd)/zyc-clang/bin/:$PATH
+        make $KERNEL_CMDLINE $KERNEL_DEFCONFIG CC="ccache clang" LD=ld.lld
+        make $KERNEL_CMDLINE CC="ccache clang" LD=ld.lld -j$(nproc --all)
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3
 
     - name: Upload Kernel-SU
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: Nyan_OOS11-KSU-${{ steps.get_time.outputs.TIME }}
+        name: Nyan_kernel-KSU-${{ steps.get_time.outputs.TIME }}
         path: "AnyKernel3/*"
