@@ -92,4 +92,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: memodule
-        path: "./out/drivers/memkernel/anko.ko"
+        path: "./out/drivers/memkernel/memkernel.ko"
