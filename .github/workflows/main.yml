@@ -62,7 +62,7 @@ jobs:
         mkdir zyc-clang
         tar -xzvf Clang-*.tar.gz -C zyc-clang >> /dev/null
         #mem module
-        curl -LSs "https://raw.githubusercontent.com/anko5/MemKernel/main/kernel/setup.sh" | bash -s M anko
+        curl -LSs "https://raw.githubusercontent.com/Poko-Apps/MemKernel/main/kernel/setup.sh" | bash -s M anrwt
         # Clone AnyKernel3
         git clone https://github.com/osm0sis/AnyKernel3
         sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
@@ -92,4 +92,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: memodule
-        path: "./out/drivers/memkernel/memkernel.ko"
+        path: "./out/drivers/memkernel/anrwt_memk.ko"
